@@ -419,3 +419,5 @@ https://twitter.com/AdrienDodin
 ---
 
 ⭐ If this project helped you, consider starring the repository.
+
+**PhantomShell** | © 2026 RedParakeet Security Team | All Rights Reserved
