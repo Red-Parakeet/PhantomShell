@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """
 PhantomShell C2 Server
-by adrilaw (https://github.com/adrilaw)
+by Adrilaw/Kidpentester (https://github.com/Adrilaw)  & The-Psypher (https://github.com/The-Psypher)
 
 Run this on your VPS. Operators connect via the web UI or CLI.
 Targets connect back with PhantomShell payloads.
@@ -55,7 +55,7 @@ def banner():
    ██║     ██╔═══╝      ╚════██║██╔══╝  ██╔══██╗╚██╗ ██╔╝██╔══╝  ██╔══██╗
    ╚██████╗███████╗     ███████║███████╗██║  ██║ ╚████╔╝ ███████╗██║  ██║
     ╚═════╝╚══════╝     ╚══════╝╚══════╝╚═╝  ╚═╝  ╚═══╝  ╚══════╝╚═╝  ╚═╝{C['R']}
-  {C['d']}PhantomShell C2 v{VERSION} — by adrilaw — github.com/adrilaw{C['R']}
+  {C['d']}PhantomShell C2 v{VERSION} — by Red Parakeet Security Team{C['R']}
 """)
 
 
