@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """
-PhantomShell v2.0 — Advanced PowerShell Evasion Framework
-by Adrilaw/Kidepntester (https://github.com/Adrilaw)
+PhantomShell v1.0 — Advanced PowerShell Evasion Framework
+by by Adrilaw/Kidpentester (https://github.com/Adrilaw)  & The-Psypher (https://github.com/The-Psypher) - Developers at Red Parakeet.
 
 Generates obfuscated, base64-encoded PowerShell reverse shells
 designed to evade signature-based AV/AMSI detection.
@@ -75,8 +75,8 @@ def banner():
        ╚════██║██╔══██║██╔══╝  ██║     ██║
        ███████║██║  ██║███████╗███████╗███████╗
        ╚══════╝╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝{C['R']}
-  {C['d']}v{VERSION} — PowerShell Evasion Framework — by adrilaw{C['R']}
-  {C['d']}https://github.com/adrilaw  [{ts}]{C['R']}
+  {C['d']}v{VERSION} — PowerShell Evasion Framework — by Red Parakeet Security Team{C['R']}
+  {C['d']}https://github.com/Red-Parakeet  [{ts}]{C['R']}
 """)
 
 
