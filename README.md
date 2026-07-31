@@ -1,14 +1,5 @@
 # 👻 PhantomShell
 
-<img width="1024" height="1024" alt="PhantomShell" src="https://github.com/user-attachments/assets/bd3b82fc-85bd-4651-b1f8-1b2a908b403a" />
-
-
-
-
-
-
-# 👻 PhantomShell
-
 <div align="center">
 <img width="1024" height="1024" alt="PhantomShell" src="https://github.com/user-attachments/assets/bd3b82fc-85bd-4651-b1f8-1b2a908b403a" />
 
@@ -16,7 +7,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.6+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![License](https://img.shields.io/badge/License-GPLv3-red?style=for-the-badge&logo=gnu&logoColor=white)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-3.0-blue?style=for-the-badge)](https://github.com/Red-Parakeet/PhantomShell)
+[![Version](https://img.shields.io/badge/Version-2.0-blue?style=for-the-badge)](https://github.com/Red-Parakeet/PhantomShell)
 
 **PhantomShell v2.0** — The most complete red-team framework for PowerShell payload generation and C2 infrastructure management.
 
