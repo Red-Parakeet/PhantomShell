@@ -761,15 +761,6 @@ If PhantomShell helped you, please consider:
 
 ---
 
-## 📊 Version History
-
-| Version | Date | Features |
-|---------|------|----------|
-| **v3.0** | 2026 | Unified C2, HTTP agents, Web UI, All-in-One deployment |
-| **v2.0** | 2025 | Payload generator enhancements, polymorphism |
-| **v1.0** | 2024 | Initial release, basic payload generation |
-
----
 
 **PhantomShell** | © 2026 Red Parakeet Security Team | All Rights Reserved
 
